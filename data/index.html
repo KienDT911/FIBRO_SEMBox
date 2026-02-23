@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>SEMBox Control Panel</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:,">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>SEMBox</h1>
+                    <span class="subtitle">Industrial Control Panel</span>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot online"></span>
+                <span class="status-text">System Online</span>
+            </div>
+        </header>
+
+        <!-- Main Dashboard -->
+        <main class="dashboard">
+            <!-- System Status Card -->
+            <section class="card status-card">
+                <div class="card-header">
+                    <h2>System Status</h2>
+                    <span class="badge active">Active</span>
+                </div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="label">Uptime</span>
+                        <span class="value" id="uptime">--:--:--</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">IP Address</span>
+                        <span class="value" id="ip-address">192.168.4.1</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Clients</span>
+                        <span class="value" id="clients">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Memory</span>
+                        <span class="value" id="memory">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- GPIO Controls -->
+            <section class="card controls-card">
+                <div class="card-header">
+                    <h2>GPIO Controls</h2>
+                </div>
+                <div class="controls-grid">
+                    <!-- GPIO 26 -->
+                    <div class="control-item" id="gpio26-control">
+                        <div class="control-info">
+                            <div class="control-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+                                </svg>
+                            </div>
+                            <div class="control-details">
+                                <span class="control-name">GPIO 26</span>
+                                <span class="control-state" id="gpio26-state">OFF</span>
+                            </div>
+                        </div>
+                        <div class="control-actions">
+                            <button class="btn btn-on" onclick="toggleGPIO(26, 'on')" id="gpio26-on">
+                                <span>ON</span>
+                            </button>
+                            <button class="btn btn-off" onclick="toggleGPIO(26, 'off')" id="gpio26-off">
+                                <span>OFF</span>
+                            </button>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-fill" id="gpio26-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- GPIO 27 -->
+                    <div class="control-item" id="gpio27-control">
+                        <div class="control-info">
+                            <div class="control-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+                                </svg>
+                            </div>
+                            <div class="control-details">
+                                <span class="control-name">GPIO 27</span>
+                                <span class="control-state" id="gpio27-state">OFF</span>
+                            </div>
+                        </div>
+                        <div class="control-actions">
+                            <button class="btn btn-on" onclick="toggleGPIO(27, 'on')" id="gpio27-on">
+                                <span>ON</span>
+                            </button>
+                            <button class="btn btn-off" onclick="toggleGPIO(27, 'off')" id="gpio27-off">
+                                <span>OFF</span>
+                            </button>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-fill" id="gpio27-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Built-in LED -->
+                    <div class="control-item" id="led-control">
+                        <div class="control-info">
+                            <div class="control-icon led-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18h6M10 22h4M12 2v1M4.93 4.93l.71.71M2 12h1M4.93 19.07l.71-.71M19.07 4.93l-.71.71M22 12h-1M19.07 19.07l-.71-.71"/>
+                                    <path d="M9 14a5 5 0 1 1 6 0v2H9v-2z"/>
+                                </svg>
+                            </div>
+                            <div class="control-details">
+                                <span class="control-name">Built-in LED</span>
+                                <span class="control-state" id="led-state">OFF</span>
+                            </div>
+                        </div>
+                        <div class="control-actions">
+                            <button class="btn btn-on" onclick="toggleLED('on')" id="led-on">
+                                <span>ON</span>
+                            </button>
+                            <button class="btn btn-off" onclick="toggleLED('off')" id="led-off">
+                                <span>OFF</span>
+                            </button>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-fill" id="led-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="card actions-card">
+                <div class="card-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="allOn()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+                        </svg>
+                        <span>All ON</span>
+                    </button>
+                    <button class="action-btn" onclick="allOff()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M4.93 4.93l14.14 14.14"/>
+                        </svg>
+                        <span>All OFF</span>
+                    </button>
+                    <button class="action-btn" onclick="refreshStatus()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 SEMBox Industrial Control System</p>
+            <p class="version">Version 1.0.0</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-message" id="toast-message"></span>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
