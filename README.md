@@ -1,4 +1,4 @@
-# SEMBox - ESP32 Industrial Control System
+S# SEMBox - ESP32 Industrial Control System
 
 Modern industrial dashboard for ESP32 with GPIO control capabilities.
 

@@ -1,23 +1,23 @@
 /*********
   SEMBox ESP32 Industrial Control System
-  Backend Server with SPIFFS Support
+  Main Controller - Handles GPIO, WiFi, and Server Logic
   
   Libraries needed:
   - ESPAsyncWebServer: https://github.com/me-no-dev/ESPAsyncWebServer
   - AsyncTCP: https://github.com/me-no-dev/AsyncTCP
-  - SPIFFS (included with ESP32 core)
+  - ArduinoJson: https://github.com/bblanchon/ArduinoJson
   
-  To upload the web files to SPIFFS:
-  1. Install "ESP32 Sketch Data Upload" tool in Arduino IDE
-  2. Place HTML/CSS/JS files in the "data" folder
-  3. Tools > ESP32 Sketch Data Upload
+  Web UI is defined in: web_content.h
 *********/
 
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <SPIFFS.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
+
+// Include web content (HTML, CSS, JS)
+#include "web_content.h"
 
 // ===========================================
 // Configuration
@@ -35,8 +35,6 @@ const char* AP_PASSWORD = "12345678";
 const int SERVER_PORT = 80;
 
 // GPIO Pin definitions
-const int GPIO_26 = 26;
-const int GPIO_27 = 27;
 const int LED_PIN = LED_BUILTIN;
 
 // ===========================================
@@ -46,10 +44,15 @@ const int LED_PIN = LED_BUILTIN;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(SERVER_PORT);
 
+// Preferences for NVS storage
+Preferences preferences;
+
 // GPIO States
-String gpio26State = "off";
-String gpio27State = "off";
 String ledState = "off";
+
+// Rotary Table Parameters (stored in NVS)
+int tableDivision = 360;
+float tableRatio = 90.0;
 
 // System variables
 unsigned long startTime = 0;
@@ -58,19 +61,18 @@ int clientCount = 0;
 // ===========================================
 // Function Prototypes
 // ===========================================
-void initSPIFFS();
 void initGPIO();
 void initWiFi();
 void initWebServer();
+void initNVS();
 String getStatus();
-String processor(const String& var);
-void handleGPIO26On(AsyncWebServerRequest *request);
-void handleGPIO26Off(AsyncWebServerRequest *request);
-void handleGPIO27On(AsyncWebServerRequest *request);
-void handleGPIO27Off(AsyncWebServerRequest *request);
+
+// Request Handlers
 void handleLEDOn(AsyncWebServerRequest *request);
 void handleLEDOff(AsyncWebServerRequest *request);
 void handleStatus(AsyncWebServerRequest *request);
+void handleParamsSave(AsyncWebServerRequest *request);
+void handleParamsLoad(AsyncWebServerRequest *request);
 void handleNotFound(AsyncWebServerRequest *request);
 
 // ===========================================
@@ -87,7 +89,7 @@ void setup() {
     startTime = millis();
     
     // Initialize components
-    initSPIFFS();
+    initNVS();
     initGPIO();
     initWiFi();
     initWebServer();
@@ -104,6 +106,8 @@ void loop() {
     // Main loop is mostly handled by AsyncWebServer
     // Add any periodic tasks here
     
+    // Example: You can add sensor readings, automation logic, etc.
+    
     delay(10);
 }
 
@@ -112,46 +116,35 @@ void loop() {
 // ===========================================
 
 /**
- * Initialize SPIFFS filesystem
- */
-void initSPIFFS() {
-    Serial.print("[SPIFFS] Initializing... ");
-    
-    if (!SPIFFS.begin(true)) {
-        Serial.println("FAILED!");
-        Serial.println("[SPIFFS] An error occurred while mounting SPIFFS");
-        return;
-    }
-    
-    Serial.println("OK");
-    
-    // List files in SPIFFS
-    Serial.println("[SPIFFS] Files found:");
-    File root = SPIFFS.open("/");
-    File file = root.openNextFile();
-    while (file) {
-        Serial.printf("  - %s (%d bytes)\n", file.name(), file.size());
-        file = root.openNextFile();
-    }
-}
-
-/**
  * Initialize GPIO pins
  */
 void initGPIO() {
     Serial.print("[GPIO] Initializing pins... ");
     
-    pinMode(GPIO_26, OUTPUT);
-    pinMode(GPIO_27, OUTPUT);
     pinMode(LED_PIN, OUTPUT);
     
-    // Set initial states (all off)
-    digitalWrite(GPIO_26, LOW);
-    digitalWrite(GPIO_27, LOW);
+    // Set initial state (off)
     digitalWrite(LED_PIN, LOW);
     
     Serial.println("OK");
-    Serial.println("[GPIO] Pins configured: GPIO26, GPIO27, Built-in LED");
+    Serial.println("[GPIO] Pins configured: Built-in LED");
+}
+
+/**
+ * Initialize NVS (Non-Volatile Storage)
+ */
+void initNVS() {
+    Serial.print("[NVS] Initializing storage... ");
+    
+    preferences.begin("sembox", false);  // false = read/write mode
+    
+    // Load saved parameters or use defaults
+    tableDivision = preferences.getInt("division", 360);
+    tableRatio = preferences.getFloat("ratio", 90.0);
+    
+    Serial.println("OK");
+    Serial.printf("[NVS] Division: %d\n", tableDivision);
+    Serial.printf("[NVS] Ratio: 1:%.3f\n", tableRatio);
 }
 
 /**
@@ -179,20 +172,30 @@ void initWiFi() {
 void initWebServer() {
     Serial.print("[Server] Configuring routes... ");
     
-    // Serve static files from SPIFFS
-    server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+    // Serve embedded web content (from web_content.h)
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send_P(200, "text/html", index_html);
+    });
     
-    // GPIO 26 routes
-    server.on("/26/on", HTTP_GET, handleGPIO26On);
-    server.on("/26/off", HTTP_GET, handleGPIO26Off);
+    server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send_P(200, "text/html", index_html);
+    });
     
-    // GPIO 27 routes
-    server.on("/27/on", HTTP_GET, handleGPIO27On);
-    server.on("/27/off", HTTP_GET, handleGPIO27Off);
+    server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send_P(200, "text/css", style_css);
+    });
+    
+    server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send_P(200, "application/javascript", script_js);
+    });
     
     // LED routes
     server.on("/LED/on", HTTP_GET, handleLEDOn);
     server.on("/LED/off", HTTP_GET, handleLEDOff);
+    
+    // Parameters routes (NVS)
+    server.on("/params/save", HTTP_GET, handleParamsSave);
+    server.on("/params/load", HTTP_GET, handleParamsLoad);
     
     // Status endpoint (JSON)
     server.on("/status", HTTP_GET, handleStatus);
@@ -210,34 +213,6 @@ void initWebServer() {
 // ===========================================
 // Request Handlers
 // ===========================================
-
-void handleGPIO26On(AsyncWebServerRequest *request) {
-    Serial.println("[GPIO] GPIO 26 -> ON");
-    gpio26State = "on";
-    digitalWrite(GPIO_26, HIGH);
-    request->send(200, "text/plain", "GPIO 26 ON");
-}
-
-void handleGPIO26Off(AsyncWebServerRequest *request) {
-    Serial.println("[GPIO] GPIO 26 -> OFF");
-    gpio26State = "off";
-    digitalWrite(GPIO_26, LOW);
-    request->send(200, "text/plain", "GPIO 26 OFF");
-}
-
-void handleGPIO27On(AsyncWebServerRequest *request) {
-    Serial.println("[GPIO] GPIO 27 -> ON");
-    gpio27State = "on";
-    digitalWrite(GPIO_27, HIGH);
-    request->send(200, "text/plain", "GPIO 27 ON");
-}
-
-void handleGPIO27Off(AsyncWebServerRequest *request) {
-    Serial.println("[GPIO] GPIO 27 -> OFF");
-    gpio27State = "off";
-    digitalWrite(GPIO_27, LOW);
-    request->send(200, "text/plain", "GPIO 27 OFF");
-}
 
 void handleLEDOn(AsyncWebServerRequest *request) {
     Serial.println("[GPIO] Built-in LED -> ON");
@@ -257,17 +232,66 @@ void handleStatus(AsyncWebServerRequest *request) {
     // Create JSON response
     JsonDocument doc;
     
-    doc["gpio26"] = gpio26State;
-    doc["gpio27"] = gpio27State;
     doc["led"] = ledState;
     doc["uptime"] = (millis() - startTime) / 1000;
     doc["clients"] = WiFi.softAPgetStationNum();
-    doc["memory"] = String(ESP.getFreeHeap() / 1024) + " KB";
+    doc["freeHeap"] = ESP.getFreeHeap();
+    doc["totalHeap"] = ESP.getHeapSize();
+    doc["flashSize"] = ESP.getFlashChipSize();
+    doc["sketchSize"] = ESP.getSketchSize();
+    doc["division"] = tableDivision;
+    doc["ratio"] = tableRatio;
     doc["ip"] = WiFi.softAPIP().toString();
     
     String response;
     serializeJson(doc, response);
     
+    request->send(200, "application/json", response);
+}
+
+void handleParamsSave(AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    
+    if (request->hasParam("division") && request->hasParam("ratio")) {
+        int newDivision = request->getParam("division")->value().toInt();
+        float newRatio = request->getParam("ratio")->value().toFloat();
+        
+        // Validate
+        if (newDivision >= 1 && newDivision <= 9999 && newRatio >= 1 && newRatio <= 9999) {
+            tableDivision = newDivision;
+            tableRatio = newRatio;
+            
+            // Save to NVS
+            preferences.putInt("division", tableDivision);
+            preferences.putFloat("ratio", tableRatio);
+            
+            Serial.printf("[NVS] Saved: Division=%d, Ratio=1:%.3f\n", tableDivision, tableRatio);
+            
+            doc["success"] = true;
+            doc["division"] = tableDivision;
+            doc["ratio"] = tableRatio;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "Invalid values (1-9999)";
+        }
+    } else {
+        doc["success"] = false;
+        doc["error"] = "Missing parameters";
+    }
+    
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void handleParamsLoad(AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    
+    doc["division"] = tableDivision;
+    doc["ratio"] = tableRatio;
+    
+    String response;
+    serializeJson(doc, response);
     request->send(200, "application/json", response);
 }
 
@@ -286,12 +310,15 @@ void handleNotFound(AsyncWebServerRequest *request) {
 String getStatus() {
     JsonDocument doc;
     
-    doc["gpio26"] = gpio26State;
-    doc["gpio27"] = gpio27State;
     doc["led"] = ledState;
     doc["uptime"] = (millis() - startTime) / 1000;
     doc["clients"] = WiFi.softAPgetStationNum();
     doc["freeHeap"] = ESP.getFreeHeap();
+    doc["totalHeap"] = ESP.getHeapSize();
+    doc["flashSize"] = ESP.getFlashChipSize();
+    doc["sketchSize"] = ESP.getSketchSize();
+    doc["division"] = tableDivision;
+    doc["ratio"] = tableRatio;
     
     String output;
     serializeJson(doc, output);
