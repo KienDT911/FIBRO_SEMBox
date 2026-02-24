@@ -27,7 +27,15 @@ const char index_html[] PROGMEM = R"rawliteral(
     <link rel="icon" href="data:,">
 </head>
 <body>
-    <div class="container">
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading FIBRO SEMBox...</div>
+        </div>
+    </div>
+
+    <div class="container" id="main-container" style="display: none;">
         <header class="header">
             <div class="logo">
                 <div class="logo-icon">
@@ -73,10 +81,6 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <span class="label">Flash</span>
                         <span class="value" id="flash">--</span>
                     </div>
-                    <div class="status-item">
-                        <span class="label">Sketch</span>
-                        <span class="value" id="sketch">--</span>
-                    </div>
                 </div>
             </section>
 
@@ -113,7 +117,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             <section class="card parameter-card">
                 <div class="card-header">
                     <h2>Rotary Table Parameter</h2>
-                    <span class="badge" id="param-status">Stored in NVS</span>
                 </div>
                 <div class="parameter-form">
                     <div class="param-group">
@@ -932,6 +935,54 @@ body::before {
     border-color: var(--accent-secondary);
     transform: translateY(-2px);
 }
+
+/* ===========================================
+   Loading Screen
+   =========================================== */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid var(--border-default);
+    border-top: 4px solid var(--accent-primary);
+    margin: 0 auto 20px auto;
+    animation: spin 1s linear infinite;
+}
+
+.loading-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 )rawliteral";
 
 
@@ -969,6 +1020,8 @@ let uptimeInterval = null;
 
 // DOM Elements
 const elements = {
+    loadingScreen: document.getElementById('loading-screen'),
+    mainContainer: document.getElementById('main-container'),
     led: {
         control: document.getElementById('led-control'),
         state: document.getElementById('led-state'),
@@ -978,7 +1031,6 @@ const elements = {
     clients: document.getElementById('clients'),
     memory: document.getElementById('memory'),
     flash: document.getElementById('flash'),
-    sketch: document.getElementById('sketch'),
     division: document.getElementById('division'),
     ratio: document.getElementById('ratio'),
     paramStatus: document.getElementById('param-status'),
@@ -1135,12 +1187,9 @@ function updateAllUI() {
         elements.memory.textContent = used + '/' + total + ' KB';
     }
     if (elements.flash) {
-        const flashMB = (state.flashSize / 1024 / 1024).toFixed(1);
-        elements.flash.textContent = flashMB + ' MB';
-    }
-    if (elements.sketch) {
-        const sketchKB = Math.round(state.sketchSize / 1024);
-        elements.sketch.textContent = sketchKB + ' KB';
+        const usedMB = (state.sketchSize / 1024 / 1024).toFixed(2);
+        const totalMB = (state.flashSize / 1024 / 1024).toFixed(1);
+        elements.flash.textContent = usedMB + '/' + totalMB + ' MB';
     }
     if (elements.division) {
         elements.division.value = state.division;
@@ -1223,13 +1272,42 @@ function startUptimeCounter() {
 // Initialization
 // ===========================================
 
+function hideLoadingScreen() {
+    if (elements.loadingScreen) {
+        elements.loadingScreen.classList.add('hidden');
+    }
+    if (elements.mainContainer) {
+        elements.mainContainer.style.display = 'flex';
+    }
+}
+
+function initializeApp() {
+    sendRequest('/status').then(response => response.json()).then(data => {
+        state.led = data.led === 'on';
+        state.uptime = data.uptime || 0;
+        state.clients = data.clients || 0;
+        state.freeHeap = data.freeHeap || 0;
+        state.totalHeap = data.totalHeap || 0;
+        state.flashSize = data.flashSize || 0;
+        state.sketchSize = data.sketchSize || 0;
+        state.division = data.division || 360;
+        state.ratio = data.ratio || 90;
+        updateAllUI();
+        hideLoadingScreen();
+        startUptimeCounter();
+        console.log('SEMBox Dashboard initialized');
+    }).catch(error => {
+        console.error('Failed to load initial data:', error);
+        // Still show UI after error with defaults
+        setTimeout(() => {
+            hideLoadingScreen();
+            startUptimeCounter();
+        }, 2000);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('SEMBox Dashboard initialized');
-    updateAllUI();
-    startUptimeCounter();
-    setTimeout(() => {
-        refreshStatus();
-    }, 1000);
+    initializeApp();
 });
 )rawliteral";
 
