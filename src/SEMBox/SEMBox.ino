@@ -255,7 +255,7 @@ void handleLEDOff(AsyncWebServerRequest *request) {
 
 void handleStatus(AsyncWebServerRequest *request) {
     // Create JSON response
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     
     doc["gpio26"] = gpio26State;
     doc["gpio27"] = gpio27State;
@@ -284,7 +284,7 @@ void handleNotFound(AsyncWebServerRequest *request) {
  * Get system status as JSON string
  */
 String getStatus() {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     
     doc["gpio26"] = gpio26State;
     doc["gpio27"] = gpio27State;
